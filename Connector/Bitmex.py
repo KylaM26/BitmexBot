@@ -7,6 +7,7 @@ import time
 import hashlib
 import urllib.parse
 import hmac
+from datetime import date, datetime
 from urllib.parse import non_hierarchical, urlencode
 
 from bitmex_websocket import BitMEXWebsocket
@@ -33,15 +34,18 @@ class Bitmex(Client):
         signature = hmac.new(self._secret_key.encode(), message.encode(), hashlib.sha256).hexdigest()
         return signature
         
-    def _request(self, method:str, endpoint:str, params=None):
-        expires = str(int(round(time.time()) + 5))
-        signature = self._generate_signature(method=method, endpoint=endpoint, data=params or '')
+    def _request(self, method:str, endpoint:str, params=None, use_headers=False):
         
-        headers = {
-            "api-expires": expires,
-            "api-key": self._public_key,
-            "api-signature": signature
-        }
+        headers = dict()
+        
+        if use_headers:
+            expires = str(int(round(time.time()) + 5))
+            signature = self._generate_signature(method=method, endpoint=endpoint, data=params or '')
+            headers = {
+                "api-expires": expires,
+                "api-key": self._public_key,
+                "api-signature": signature
+            }
         
         response = requests.request(method=method, url=self.base_url+endpoint, params=params, headers=headers)
             
@@ -57,8 +61,11 @@ class Bitmex(Client):
         instruments_response = self._request("GET", "/api/v1/instrument", None)
         instruments = []
         
-        for instrument in instruments_response:
-            instruments.append(instrument["symbol"])
+        if instruments_response is not None:
+            for instrument in instruments_response:
+                instruments.append(instrument["symbol"])
+        else:
+            print("Failed to collect instruments.")
             
         return instruments
     
@@ -78,7 +85,7 @@ class Bitmex(Client):
              
 
         endpoint = '/api/v1/order'
-        order = self._request("POST", endpoint, params)
+        order = self._request("POST", endpoint, params, use_headers=True)
         
         if order is not None:
             order_dict = dict()
@@ -106,8 +113,12 @@ class Bitmex(Client):
         params = dict()
         params = { "orderID" : order_id }
             
-        response = self._request("DELETE", endpoint, params)
-        self.orders.pop(order_id)
+        response = self._request("DELETE", endpoint, params, use_headers=True)
+        
+        if response is not None:
+            self.orders.pop(order_id)
+        else:
+            print("Failed to cancelled order")
 
         return response
         
@@ -122,7 +133,7 @@ class Bitmex(Client):
             filters = { "open" : True }
             params["filter"] = json.dumps(filters)
         
-        orders = self._request("GET", endpoint, params)
+        orders = self._request("GET", endpoint, params, use_headers=True)
         
         if orders is not None:
             data = dict()
@@ -138,13 +149,17 @@ class Bitmex(Client):
                 order_dict["type"] = order["ordType"]
                 order_dict["status"] = order["ordStatus"]
                 data[order["orderID"]] = order_dict
+        else:
+            print("No order data avaliable")
+                
 
         return data
             
-    def get_historical_data(self, symbol:str, start:typing.Union[str, None]=None, end:typing.Union[str, None]=None, candle_count=1000):
+    def get_historical_data(self, symbol:str, start:typing.Union[str, None]=None, end:typing.Union[str, None]=None, granularity="1m", candle_count=1000):
         super().get_historical_data(symbol, start, end, candle_count)
+        
         params = {
-            "binSize": "1m",
+            "binSize": granularity,
             "symbol": symbol.upper(),
             "count": candle_count,
         }
@@ -155,7 +170,7 @@ class Bitmex(Client):
         end_point = "/api/v1/trade/bucketed"
         
         if start is None and end is None:
-            last_start_time = datetime.today().date()
+            last_start_time = datetime.today()
             end = datetime.now()
             params["endTime"] = end
             
@@ -163,6 +178,7 @@ class Bitmex(Client):
                 params["startTime"] = last_start_time   
                
                 data_response = self._request("GET", end_point, params=params)
+                
                 if data_response is None:
                     print("No candle data is availiable.")
                     break
