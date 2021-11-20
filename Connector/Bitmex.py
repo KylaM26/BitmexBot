@@ -58,7 +58,7 @@ class Bitmex(Client):
     
     def _get_instruments(self):
         super()._get_instruments()
-        instruments_response = self._request("GET", "/api/v1/instrument", None)
+        instruments_response = self._request("GET", "/api/v1/instrument/active", None)
         instruments = []
         
         if instruments_response is not None:
@@ -158,6 +158,8 @@ class Bitmex(Client):
     def get_historical_data(self, symbol:str, start:typing.Union[str, None]=None, end:typing.Union[str, None]=None, granularity="1m", candle_count=1000):
         super().get_historical_data(symbol, start, end, candle_count)
         
+        collect_rate = 2
+        
         params = {
             "binSize": granularity,
             "symbol": symbol.upper(),
@@ -198,10 +200,12 @@ class Bitmex(Client):
                     print("Iteration {}: {} candles collected | Total candles {}".format(counter, len(data_response), len(candles)))
                 
                 if (len(data_response) < candle_count):
-                    candles.pop()
+                    if len(candles) > 0:
+                        candles.pop()
                     break
                 
-                counter += 1        
+                counter += 1  
+                time.sleep(collect_rate)    
         elif start is not None and end is None:
             last_start_time = start
             end = datetime.now()
@@ -215,7 +219,6 @@ class Bitmex(Client):
                     print("No candle data is availiable.")
                     break
 
-        
                 for candle in data_response:            
                     data = dict()
                     data["date"] =   candle["timestamp"]
@@ -226,19 +229,24 @@ class Bitmex(Client):
                     data["volume"] = candle["volume"]
                     candles.append(data)
                 
-                last_start_time = candles[-1]["date"]
+                if len(candles) > 0:
+                    last_start_time = candles[-1]["date"]
+                    
                 print("Iteration {}: {} candles collected | Total candles {}".format(counter, len(data_response), len(candles)))
                 counter += 1  
                 
                         
                 if(len(data_response) < candle_count):
-                    candles.pop()
+                    if len(candles) > 0:
+                        candles.pop()
                     break 
+                
+                time.sleep(collect_rate)
         else:
             last_start_time = start
             params["endTime"] = end
             
-            while(True):   
+            while(True):  
                 params["startTime"] = last_start_time   
                
                 data_response = self._request("GET", end_point, params=params)
@@ -265,6 +273,8 @@ class Bitmex(Client):
                     break
                 
                 counter += 1
+                
+                time.sleep(collect_rate) 
 
         return candles
             

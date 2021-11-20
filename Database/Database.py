@@ -6,6 +6,7 @@ import pandas as pd
 from datetime import datetime
 from pandas.tseries.frequencies import get_period_alias
 from requests.api import get
+from Connector.Bitmex import Bitmex
 
 from Connector.Client import Client
 
@@ -13,9 +14,19 @@ class Database:
     def __init__(self, path:str):
         self.path = path
     def add_data(self, client:Client, symbol:str, start=None, end=None):
+        symbol_is_valid = False
+        symbol = symbol.upper()
+        
+        for instrument in client.instruments:
+            if instrument.upper() == symbol:
+                symbol_is_valid = True
+                break
+            
+        if symbol_is_valid == False:
+            print("Symbol '{}' is not a valid symbol in the {} database.".format(symbol, client.name))
+            return None
         # If start and end are none -> Get latest data
         # If start -> Write older data
-        symbol = symbol.upper()
         filename = client.name + "_" + symbol + ".csv"
 
         if self._does_file_exist(file=filename) == False: # Inital data
