@@ -13,6 +13,7 @@ from Connector.Client import Client
 class Database: 
     def __init__(self, path:str):
         self.path = path
+        
     def add_data(self, client:Client, symbol:str, start=None, end=None):
         symbol_is_valid = False
         symbol = symbol.upper()
@@ -53,6 +54,7 @@ class Database:
         start_date = dataframe.head(1).index
         data = client.get_historical_data(symbol=symbol, start=start_date)
         df = pd.DataFrame(data=data)
+       # df['date'] = pd.to_datetime(df['date'].astype(str), format='%Y-%m-%dT%H:%M:%S.%fZ')
         df.set_index("date",inplace=True)
         df.to_csv(self.path + client.name + '_' + symbol + '.csv')
         return self.get_data(client_name=client.name, symbol=symbol)

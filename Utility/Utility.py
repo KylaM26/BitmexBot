@@ -1,4 +1,5 @@
 import pandas as pd
+from datetime import datetime
 
 time_frames = {
     "1m" : "1T",
@@ -19,3 +20,14 @@ time_frames = {
 
 def resample_dataframe(df: pd.DataFrame, time_frame:str):
     return df.resample(time_frames[time_frame]).agg({'open':'first', 'high':'max', 'low':'min', 'close':'last', 'volume':'sum'})
+
+def str2int64time(date:str):
+    date_str = datetime.strptime(date, "%Y-%m-%dT%H:%M.%SZ")    
+    return int(datetime.timestamp(date_str))
+
+def datetime2str(date:datetime):
+    return datetime.strftime(date, "%Y-%m-%dT%H:%M.%SZ")
+
+def int64time2str(date:int):
+    date_time = datetime.fromtimestamp(date)
+    return date_time.strftime("%Y-%m-%dT%H:%M.%SZ")
